@@ -1,0 +1,84 @@
+ame: Configure Azure environment
+
+on: 
+  pull_request:
+    types: [labeled]
+
+env:
+  PACKAGES_TOKEN: ${{secrets.PACKAGES_TOKEN}}
+  AZURE_RESOURCE_GROUP: cd-with-actions
+  AZURE_CONTAINERAPPS_ENVIRONMENT: actions-ttt-deployment
+  AZURE_LOCATION: '"eastus2"'
+  #################################################
+  ### USER PROVIDED VALUES ARE REQUIRED BELOW   ###
+  #################################################
+  #################################################
+  ### REPLACE <username> WITH GH USERNAME         ###
+  AZURE_CONTAINER_APP_NAME: yanhsu-ttt-app
+  #################################################
+
+jobs:
+  setup-up-azure-resources:
+    runs-on: ubuntu-latest
+
+    if: contains(github.event.pull_request.labels.*.name, 'spin up environment')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Azure login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Create Azure resource group
+        if: success()
+        run: |
+          az group create --location ${{env.AZURE_LOCATION}} --name ${{env.AZURE_RESOURCE_GROUP}} --subscription ${{secrets.AZURE_SUBSCRIPTION_ID}}
+#       - name: Create Azure app service plan
+#         if: success()
+#         run: |
+#           az appservice plan create --resource-group ${{env.AZURE_RESOURCE_GROUP}} --name ${{env.AZURE_APP_PLAN}} --is-linux --sku F1 --subscription ${{secrets.AZURE_SUBSCRIPTION_ID}}
+#       - name: Create webapp resource
+#         if: success()
+#         run: |
+#           az webapp create --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --plan ${{ env.AZURE_APP_PLAN }} --name ${{ env.AZURE_WEBAPP_NAME }}  --deployment-container-image-name nginx --subscription ${{secrets.AZURE_SUBSCRIPTION_ID}}
+#       - name: Configure webapp to use GitHub Packages
+#         if: success()
+#         run: |
+#           az webapp config container set --docker-custom-image-name nginx --docker-registry-server-password ${{secrets.GITHUB_TOKEN}} --docker-registry-server-url https://docker.pkg.github.com --docker-registry-server-user ${{github.actor}} --name ${{ env.AZURE_WEBAPP_NAME }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --subscription ${{secrets.AZURE_SUBSCRIPTION_ID}}
+      - name: Install the Azure Container Apps extension for the CLI
+        if: success()
+        run: |
+          az extension add --name containerapp --upgrade 
+      - name: Register the Microsoft.App namespace
+        if: success()
+        run: |
+          az provider register --namespace Microsoft.App 
+      - name: Create the container app environment
+        if: success()
+        run: |
+          az containerapp env create --location ${{env.AZURE_LOCATION}} --resource-group ${{env.AZURE_RESOURCE_GROUP}} --name ${{env.AZURE_CONTAINERAPPS_ENVIRONMENT}} --subscription ${{secrets.AZURE_SUBSCRIPTION_ID}} 
+      - name: Create a container app
+        if: success()
+        run: |
+          az containerapp create --name ${{env.AZURE_CONTAINER_APP_NAME}} --resource-group ${{env.AZURE_RESOURCE_GROUP}} --environment ${{env.AZURE_CONTAINERAPPS_ENVIRONMENT}} --image nginx --target-port 80 --ingress 'external' --query properties.configuration.ingress.fqdn
+  destroy-azure-resources:
+    runs-on: ubuntu-latest
+
+    if: contains(github.event.pull_request.labels.*.name, 'destroy environment')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Azure login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Destroy Azure environment
+        if: success()
+        run: |
+          az group delete --name ${{env.AZURE_RESOURCE_GROUP}} --subscription ${{secrets.AZURE_SUBSCRIPTION_ID}} --yes
