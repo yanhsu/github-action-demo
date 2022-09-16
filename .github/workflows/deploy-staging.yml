@@ -1,7 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
 name: Deploy to staging
-
 # Controls when the workflow will run
 on:
   # Triggers the workflow on push or pull request events but only for the "main" branch
@@ -10,7 +9,7 @@ on:
 
   # Allows you to run this workflow manually from the Actions tab
   
-  env:
+env:
   IMAGE_REGISTRY_URL: ghcr.io
   AZURE_RESOURCE_GROUP: cd-with-actions
   ###############################################
